@@ -90,12 +90,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     .callPhoneBySim(phone, new OnSimCallPhoneResultListener<SimRiskControlBean>() {
                         @Override
                         public void onSucceed(SimRiskControlBean simRiskControlBean) {
-                            if (simRiskControlBean.getType() == 0) {
-                                //调用系统的拨号组件外呼
-                                PhoneManager.callPhoneBySim(simRiskControlBean.getPhone(), simRiskControlBean.getCallTime());
+                            if (StringUtils.equals("1", simRiskControlBean.getHttpStatus())) {
+                                if (simRiskControlBean.getType() == 0) {
+                                    //调用系统的拨号组件外呼
+                                    PhoneManager.callPhoneBySim(
+                                            simRiskControlBean.getPhone(),
+                                            simRiskControlBean.getCallTime(),
+                                            "扩展信息");
+                                } else {
+                                    ToastUtils.showMessage("风控号码，禁止外呼");
+                                    //TODO 自己实现相应的业务逻辑
+                                }
                             } else {
-                                ToastUtils.showMessage("风控号码，禁止外呼");
-                                //TODO 自己实现相应的业务逻辑
+                                //TODO 报错了
+                                ToastUtils.showMessage(simRiskControlBean.getMsg());
                             }
                         }
 

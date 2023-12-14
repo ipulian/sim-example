@@ -14,5 +14,5 @@ dependencyResolutionManagement {
         maven { url 'https://jitpack.io' }
     }
 }
-rootProject.name = "MyApplication"
+rootProject.name = "主卡外呼Demo"
 include ':app'
