@@ -93,10 +93,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             if (StringUtils.equals("1", simRiskControlBean.getHttpStatus())) {
                                 if (simRiskControlBean.getType() == 0) {
                                     //调用系统的拨号组件外呼
+                                    //simIndex：0轮拨，1卡1；2卡2
                                     PhoneManager.callPhoneBySim(
                                             simRiskControlBean.getPhone(),
                                             simRiskControlBean.getCallTime(),
-                                            "扩展信息");
+                                            "扩展信息", 1);
                                 } else {
                                     ToastUtils.showMessage("风控号码，禁止外呼");
                                     //TODO 自己实现相应的业务逻辑
