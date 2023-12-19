@@ -28,4 +28,24 @@
         android:layout_marginTop="100dp"
         android:text="获取所有文件访问权限" />
 
+
+    <Button
+        android:id="@+id/btn_query_calllog"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="30dp"
+        android:text="1.获取操作系统话单列表" />
+
+    <Button
+        android:id="@+id/btn_query_recording"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="2.获取操作系统录音列表" />
+
+    <Button
+        android:id="@+id/btn_upload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="3.手动上传" />
+
 </LinearLayout>

@@ -8,39 +8,90 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.CallLog;
 import android.provider.Settings;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.elvishew.xlog.XLog;
+import com.ipusoft.context.AppContext;
 import com.ipusoft.context.IpuSoftSDK;
+import com.ipusoft.context.base.IObserver;
 import com.ipusoft.context.bean.AuthInfo;
 import com.ipusoft.context.bean.SimRiskControlBean;
+import com.ipusoft.context.bean.SysRecording;
 import com.ipusoft.context.component.ToastUtils;
 import com.ipusoft.context.config.Env;
+import com.ipusoft.context.constant.DateTimePattern;
 import com.ipusoft.context.manager.PhoneManager;
+import com.ipusoft.localcall.UploadFileObserve;
+import com.ipusoft.localcall.bean.SysCallLog;
+import com.ipusoft.localcall.bean.UploadResponse;
+import com.ipusoft.localcall.bean.UploadSysRecordingBean;
+import com.ipusoft.localcall.constant.UploadStatus;
+import com.ipusoft.localcall.datastore.SimDataRepo;
+import com.ipusoft.localcall.module.UploadService;
+import com.ipusoft.localcall.repository.CallLogRepo;
+import com.ipusoft.localcall.repository.FileRepository;
+import com.ipusoft.localcall.repository.RecordingFileRepo;
+import com.ipusoft.oss.AliYunManager;
+import com.ipusoft.oss.AliYunUploadManager;
 import com.ipusoft.sim.http.SimHttp;
 import com.ipusoft.sim.iface.OnSimCallPhoneResultListener;
 import com.ipusoft.utils.AppUtils;
+import com.ipusoft.utils.ArrayUtils;
+import com.ipusoft.utils.DateTimeUtils;
+import com.ipusoft.utils.EncodeUtils;
+import com.ipusoft.utils.ExceptionUtils;
+import com.ipusoft.utils.FileUtilsKt;
 import com.ipusoft.utils.GsonUtils;
 import com.ipusoft.utils.StringUtils;
+import com.ipusoft.utils.ThreadUtils;
 import com.tbruyelle.rxpermissions3.RxPermissions;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
+import io.reactivex.rxjava3.annotations.NonNull;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.ObservableOnSubscribe;
+import io.reactivex.rxjava3.schedulers.Schedulers;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     private static final String TAG = "MainActivity";
 
-    private Button btnDial, btnStorageManagerPermission;
+    private Button btnDial, btnQueryCallLog, btnQueryRecording, btnUpload, btnStorageManagerPermission;
+
+    private List<SysCallLog> callLogList;
+    private List<File> fileList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        btnDial = (Button) findViewById(R.id.btn_dial);
-        btnDial.setOnClickListener(this);
+        callLogList = new ArrayList<>();
+        fileList = new ArrayList<>();
 
+        btnDial = (Button) findViewById(R.id.btn_dial);
+        btnQueryCallLog = (Button) findViewById(R.id.btn_query_calllog);
+        btnQueryRecording = (Button) findViewById(R.id.btn_query_recording);
+        btnUpload = (Button) findViewById(R.id.btn_upload);
         btnStorageManagerPermission = (Button) findViewById(R.id.btn_storage_manager_permission);
+
+        btnDial.setOnClickListener(this);
+        btnQueryCallLog.setOnClickListener(this);
+        btnQueryRecording.setOnClickListener(this);
+        btnDial.setOnClickListener(this);
+        btnUpload.setOnClickListener(this);
         btnStorageManagerPermission.setOnClickListener(this);
 
 
@@ -48,6 +99,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Manifest.permission.CALL_PHONE,
                 Manifest.permission.READ_CALL_LOG,
                 Manifest.permission.WRITE_CALL_LOG,
+                Manifest.permission.READ_SMS,
                 Manifest.permission.READ_CONTACTS,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
                 Manifest.permission.READ_EXTERNAL_STORAGE,
@@ -57,22 +109,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             }
         });
-
         initSDK();
     }
 
     //初始化SDK（需要先获取 READ_PHONE_STATE 权限，否则会初始化失败）
     private void initSDK() {
         Log.d(TAG, "initSDK: --------->初始化SDK");
+//        IpuSoftSDK.init(getApplication(),
+//                Env.OPEN_DEV, new AuthInfo("4571122846924808", "6d8f5dff290bac1dd92708b638046125",
+//                        "gw"));
         IpuSoftSDK.init(getApplication(),
-                Env.OPEN_DEV, new AuthInfo("4571122846924808", "6d8f5dff290bac1dd92708b638046125",
-                        "gw"));
+                Env.OPEN_PRO, new AuthInfo("4615043207659530", "336ce5f4b07e8b656c62d53dba16f1d3",
+                        "18317893005"));
     }
 
 
     @Override
     public void onClick(View v) {
-        if (v.getId() == btnDial.getId()) {
+        if (v.getId() == btnDial.getId()) {//拨号
             EditText etPhone = (EditText) findViewById(R.id.et_phone);
             String phone = etPhone.getText().toString();
             if (StringUtils.isEmpty(phone)) {
@@ -86,6 +140,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
              * READ_EXTERNAL_STORAGE 获取通话录音
              * READ_CALL_LOG 获取通话记录
              */
+
+            //调用系统的拨号组件外呼
+//            PhoneManager.callPhoneBySim(
+//                    phone, DateTimeUtils.getCurrentTime(DateTimePattern.getDateTimeWithSecondFormat()),
+//                    "这里传扩展字段，话单推送时会进行回传", 1);
+
+
             SimHttp.getInstance()
                     .callPhoneBySim(phone, new OnSimCallPhoneResultListener<SimRiskControlBean>() {
                         @Override
@@ -94,10 +155,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                 if (simRiskControlBean.getType() == 0) {
                                     //调用系统的拨号组件外呼
                                     //simIndex：0轮拨，1卡1；2卡2
-                                    PhoneManager.callPhoneBySim(
-                                            simRiskControlBean.getPhone(),
-                                            simRiskControlBean.getCallTime(),
-                                            "扩展信息", 1);
+                                    PhoneManager.callPhoneBySim(MainActivity.this,
+                                            simRiskControlBean.getPhone(), simRiskControlBean.getCallTime(),
+                                            "这里传扩展字段，话单推送时会进行回传", 0);
                                 } else {
                                     ToastUtils.showMessage("风控号码，禁止外呼");
                                     //TODO 自己实现相应的业务逻辑
@@ -113,7 +173,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             Log.d("TAG", "throwable: ------" + GsonUtils.toJson(throwable));
                         }
                     });
-        } else if (v.getId() == btnStorageManagerPermission.getId()) {
+        } else if (v.getId() == btnStorageManagerPermission.getId()) {//获取所有文件访问权限
             //检查存储管理权限(用于获取录音)
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()) {
                 //TODO 已经有权限了
@@ -137,6 +197,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     ToastUtils.showMessage("请手动打开");
                 }
             }
+        } else if (v.getId() == btnQueryCallLog.getId()) {//获取系统话单
+            //只支持查询72小时内的操作系统通话记录列表
+            new Thread(() -> {
+                int page = 0;//分页从0开始计数，
+                int pageSize = 15;//每页15条
+                //总条数，TODO 前端业务自己根据数据总条数做分页
+                int count = CallLogRepo.queryTotalCount();
+                System.out.println("count----------->" + count);
+                //查询数据
+                callLogList = CallLogRepo.querySysCallLog(page, pageSize);
+                System.out.println("sysCallLogs----------->" + GsonUtils.toJson(callLogList));
+            }).start();
+        } else if (v.getId() == btnQueryRecording.getId()) {//获取系统录音
+            // TODO 需要先获取【所有文件访问权限】 否则获取不到任何录音文件
+            new Thread(() -> {
+                //只查询近3天的录音数据
+                long timestamp = System.currentTimeMillis() - 5 * 24 * 60 * 60 * 1000;
+                fileList = RecordingFileRepo.getInstance().queryRecordingFile(timestamp);
+                if (fileList != null && fileList.size() != 0) {
+                    Collections.sort(fileList, (o1, o2) -> (int) (o1.lastModified() - o2.lastModified()));
+                    for (File file : fileList) {
+                        System.out.println("fileName----------->" + file.getName());
+                    }
+                } else {
+                    //TODO 没有查到相关录音数据
+                }
+            }).start();
+        } else if (v.getId() == btnUpload.getId()) {//手动上传话单(可能包含录音文件)
+            /**
+             * 这里只是样例程序，仅作演示，话单和录音文件,需要上层代码逻辑去关联，或者让客户去手动关联
+             */
+            //TODO 这里的 SysCallLog 是通过【获取操作系统话单列表】返回的数据
+            SysCallLog callLog = callLogList.get(0);
+            System.out.println("callLog----->" + GsonUtils.toJson(callLog));
+            //TODO 这里的 File 是通过【获取操作系统录音列表】返回的数据
+            File file = fileList.get(0);
+            System.out.println("file----->" + GsonUtils.toJson(file));
+            //如果话单没有对应的录音文件,file传null
+
+            //上传话单（录音）
+            AliYunUploadManager.uploadFile(callLog, file);
         }
     }
 }
