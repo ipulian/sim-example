@@ -34,18 +34,43 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="30dp"
-        android:text="1.获取操作系统话单列表" />
+        android:text="1.获取操作系统话单列表"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/btn_query_recording"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="2.获取操作系统录音列表" />
+        android:text="2.获取操作系统录音列表"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/btn_upload"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="3.手动上传" />
+        android:text="3.手动上传"
+        android:visibility="gone" />
+
+
+    <Button
+        android:id="@+id/btn_queryCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:text="查询上传记录总条数" />
+
+    <Button
+        android:id="@+id/btn_queryList"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="查询上传记录列表" />
+
+    <Button
+        android:id="@+id/btn_upload2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="手动上传记录" />
 
 </LinearLayout>
